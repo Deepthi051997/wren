@@ -1,0 +1,83 @@
+name: Build Multi-Platform Wheels
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'wren-core-py/**'
+      - 'wren-core/**'
+      - 'wren-core-base/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          # macOS
+          - os: macos-latest
+            target: x86_64-unknown-darwin
+            arch: x86_64
+          - os: macos-latest
+            target: aarch64-unknown-darwin
+            arch: arm64
+          # Linux
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            arch: x86_64
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            arch: arm64
+          # Windows
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            arch: x86_64
+          - os: windows-latest
+            target: aarch64-pc-windows-msvc
+            arch: arm64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install maturin
+
+      - name: Install zig (for Linux cross-compilation)
+        if: runner.os == 'Linux' && matrix.arch == 'arm64'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zig
+
+      - name: Build wheel
+        working-directory: wren-core-py
+        run: |
+          maturin build --release --target ${{ matrix.target }}
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v3
+        with:
+          name: wheels
+          path: wren-core-py/target/wheels/
+
+      - name: Publish to PyPI (on release)
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
+        working-directory: wren-core-py
+        run: |
+          maturin publish --target ${{ matrix.target }}
