@@ -8,66 +8,54 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        include:
-          # macOS
-          - os: macos-latest
-            target: x86_64-unknown-darwin
-            arch: x86_64
-          - os: macos-latest
-            target: aarch64-unknown-darwin
-            arch: arm64
-          # Linux
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            arch: x86_64
-          - os: ubuntu-latest
-            target: aarch64-unknown-linux-gnu
-            arch: arm64
-          # Windows
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            arch: x86_64
-          - os: windows-latest
-            target: aarch64-pc-windows-msvc
-            arch: arm64
-
+  build-linux-x86:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - uses: actions/setup-python@v4
         with:
           python-version: '3.11'
-
-      - name: Install dependencies
+      - name: Build Linux x86_64 wheel
         run: |
-          python -m pip install --upgrade pip
           pip install maturin
-
-      - name: Build wheel
-        working-directory: wren-core-py
-        run: |
-          maturin build --release --target ${{ matrix.target }}
-
-      - name: Upload wheels
-        uses: actions/upload-artifact@v3
+          cd wren-core-py
+          maturin build --release
+      - uses: actions/upload-artifact@v3
         with:
           name: wheels
           path: wren-core-py/target/wheels/
 
-      - name: Publish to PyPI (on release)
-        if: startsWith(github.ref, 'refs/tags/')
-        env:
-          MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
-        working-directory: wren-core-py
+  build-macos-arm:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Build macOS ARM64 wheel
         run: |
-          maturin publish --target ${{ matrix.target }}
+          pip install maturin
+          cd wren-core-py
+          maturin build --release
+      - uses: actions/upload-artifact@v3
+        with:
+          name: wheels
+          path: wren-core-py/target/wheels/
+
+  build-windows-x86:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Build Windows x86_64 wheel
+        run: |
+          pip install maturin
+          cd wren-core-py
+          maturin build --release
+      - uses: actions/upload-artifact@v3
+        with:
+          name: wheels
+          path: wren-core-py/target/wheels/
+
